@@ -2,6 +2,8 @@
 
 Jeden plik HTML, który udaje mały system operacyjny działający w przeglądarce.
 
+🌍 **Wersja online (GitHub Pages):** https://v4786669-sudo.github.io/pyos/
+
 ## Co jest w środku
 
 - 🖥️ **Pulpit** z ikonami, przeciąganymi oknami (zmiana rozmiaru, minimalizacja, maksymalizacja), paskiem zadań, menu Start, tapetami i ekranem wyłączania/restartu
