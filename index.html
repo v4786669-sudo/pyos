@@ -1,0 +1,1579 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="PyOS — mini system operacyjny w przeglądarce z terminalem Pythona">
+<title>PyOS — mini system w przeglądarce</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐍</text></svg>">
+<style>
+:root{
+  --accent:#22d3ee; --accent2:#818cf8;
+  --bg:#0b0e14; --panel:#11161f; --panel2:#161d29;
+  --text:#e5e7eb; --dim:#8b93a3;
+  --border:#232b3a; --taskbar-h:46px;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;font-family:ui-sans-serif,system-ui,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:#000;overflow:hidden;color:var(--text)}
+button{font:inherit}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-thumb{background:#2a3444;border-radius:6px;border:2px solid #0d1117}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ============ PULPIT ============ */
+#desktop{position:fixed;inset:0 0 var(--taskbar-h) 0;overflow:hidden;background:#0b0e14;transition:background .3s}
+.wp-aurora,.wp-prev-aurora{background:radial-gradient(1200px 800px at 20% 10%,#155e75,transparent 60%),radial-gradient(1000px 700px at 80% 90%,#4c1d95,transparent 55%),radial-gradient(900px 600px at 70% 20%,#0f766e,transparent 50%),linear-gradient(160deg,#0b1020,#0a0f1e)}
+.wp-ocean,.wp-prev-ocean{background:linear-gradient(160deg,#0c4a6e,#075985 55%,#082f49)}
+.wp-sunset,.wp-prev-sunset{background:linear-gradient(160deg,#7c2d12,#b45309 45%,#831843 90%)}
+.wp-night,.wp-prev-night{background:radial-gradient(1200px 900px at 75% 20%,#1e293b,transparent 60%),linear-gradient(180deg,#020617,#0f172a)}
+.wp-matrix,.wp-prev-matrix{background:radial-gradient(1100px 800px at 30% 80%,#14532d,transparent 60%),linear-gradient(180deg,#04150a,#052e16)}
+.wp-mono,.wp-prev-mono{background:linear-gradient(160deg,#1f2937,#111827)}
+.d-icon{position:absolute;width:86px;padding:10px 4px;border-radius:10px;text-align:center;cursor:pointer;user-select:none;transition:background .12s}
+.d-icon .ico{font-size:34px;display:block;line-height:1.2;filter:drop-shadow(0 2px 4px rgba(0,0,0,.5))}
+.d-icon .lbl{margin-top:4px;font-size:11.5px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.8);word-break:break-word}
+.d-icon.selected{background:rgba(255,255,255,.14);outline:1px solid rgba(255,255,255,.28)}
+.d-icon:hover{background:rgba(255,255,255,.08)}
+
+/* ============ OKNA ============ */
+.window{position:absolute;min-width:340px;min-height:220px;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--border);border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.55);overflow:hidden;animation:winin .18s ease}
+@keyframes winin{from{transform:scale(.96);opacity:0}to{transform:scale(1);opacity:1}}
+.window.focused{border-color:#2d3a52;box-shadow:0 18px 60px rgba(0,0,0,.65)}
+.win-titlebar{height:36px;flex:0 0 36px;display:flex;align-items:center;gap:8px;padding:0 6px 0 10px;background:linear-gradient(180deg,#1a2230,#141b27);border-bottom:1px solid var(--border);user-select:none;cursor:default}
+.window.focused .win-titlebar{background:linear-gradient(180deg,#202b3c,#161e2b)}
+.win-ico{font-size:14px}
+.win-title{flex:1;font-size:12.5px;color:#cbd5e1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.win-btns{display:flex;gap:4px}
+.wb{width:27px;height:24px;border:1px solid transparent;background:transparent;color:#9aa4b2;border-radius:6px;cursor:pointer;font-size:12px;line-height:1;padding:0}
+.wb:hover{background:#2a3444;color:#fff}
+.wb-close:hover{background:#dc2626;color:#fff}
+.win-body{flex:1;display:flex;flex-direction:column;min-height:0;background:#0d1117;overflow:hidden}
+.win-resize{position:absolute;right:0;bottom:0;width:16px;height:16px;cursor:nwse-resize}
+body.dragging iframe{pointer-events:none}
+
+/* ============ PASEK ZADAŃ ============ */
+#taskbar{position:fixed;left:0;right:0;bottom:0;height:var(--taskbar-h);background:rgba(13,17,24,.93);backdrop-filter:blur(10px);border-top:1px solid #1f2735;display:flex;align-items:center;gap:6px;padding:0 8px;z-index:9000}
+#start-btn{display:flex;align-items:center;gap:7px;height:32px;padding:0 12px;border:0;border-radius:8px;background:linear-gradient(135deg,#0891b2,#4f46e5);color:#fff;font-weight:600;cursor:pointer;font-size:13px}
+#start-btn:hover{filter:brightness(1.12)}
+.tb-win{display:flex;align-items:center;gap:7px;height:32px;padding:0 10px;max-width:180px;border:1px solid transparent;background:#151b26;color:#aab3c0;border-radius:8px;cursor:pointer;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tb-win:hover{background:#1c2533}
+.tb-win.active{background:#24304a;color:#fff;border-color:#2e3d5c}
+.tb-win .ti{font-size:13px}
+.tb-win .tl{overflow:hidden;text-overflow:ellipsis}
+#tb-clock{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;padding:0 8px;user-select:none;line-height:1.15}
+#tb-clock .ck-time{font-size:12.5px;color:#e5e7eb;font-variant-numeric:tabular-nums}
+#tb-clock .ck-date{font-size:10px;color:#8b93a3}
+
+/* ============ MENU START ============ */
+#start-menu{position:fixed;left:10px;bottom:calc(var(--taskbar-h) + 10px);width:290px;background:rgba(17,22,31,.98);border:1px solid #24304a;border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,.6);padding:10px;z-index:9500;display:none;animation:winin .12s ease}
+.sm-title{padding:8px 10px;font-weight:700;font-size:14px;letter-spacing:.4px;background:linear-gradient(90deg,#22d3ee,#818cf8);-webkit-background-clip:text;background-clip:text;color:transparent}
+.sm-item{display:flex;gap:11px;align-items:center;padding:9px 10px;border-radius:8px;cursor:pointer;font-size:13.5px;color:#d7dce4}
+.sm-item:hover{background:#1d2736}
+.sm-item .si{font-size:16px;width:20px;text-align:center}
+.sm-sep{height:1px;background:#24304a;margin:6px 4px}
+.sm-danger{color:#f0a8a8}
+.sm-danger:hover{background:#2b1c22}
+
+/* ============ MENU KONTEKSTOWE ============ */
+#ctx{position:fixed;background:rgba(17,22,31,.98);border:1px solid #24304a;border-radius:10px;padding:6px;min-width:200px;z-index:99999;display:none;box-shadow:0 10px 34px rgba(0,0,0,.55)}
+.ctx-i{padding:7px 10px;border-radius:7px;font-size:13px;cursor:pointer;display:flex;justify-content:space-between;gap:16px;color:#d7dce4}
+.ctx-i:hover{background:#1d2736}
+.ctx-hint{color:#6b7280;font-size:11px}
+.ctx-sep{height:1px;background:#24304a;margin:4px 6px}
+
+/* ============ PRZYCISKI NARZĘDZI ============ */
+.tbtn{background:#1a2230;border:1px solid #2a3444;color:#cbd5e1;border-radius:7px;padding:4px 10px;font-size:12px;cursor:pointer;white-space:nowrap}
+.tbtn:hover{background:#232e40;color:#fff}
+.tbtn.primary{background:#0e7490;border-color:#0e7490;color:#fff}
+.tbtn.primary:hover{background:#0891b2}
+.spacer{flex:1}
+
+/* ============ TERMINAL ============ */
+.term{flex:1;min-height:0;display:flex;flex-direction:column;background:#0a0d12;font-family:'Cascadia Code','JetBrains Mono',Consolas,'Courier New',monospace;font-size:13.5px}
+.term-head{display:flex;align-items:center;gap:8px;padding:5px 10px;background:#10151d;border-bottom:1px solid #1d2530;font-size:11.5px;color:#8b93a3;font-family:ui-sans-serif,system-ui,sans-serif;flex:0 0 auto}
+.term-head .dot{width:8px;height:8px;border-radius:50%;background:#f59e0b;flex:0 0 auto}
+.term-head .dot.ok{background:#22c55e}
+.term-head .dot.err{background:#ef4444}
+.term-head .tbtn{padding:2px 8px;font-size:11px}
+.term-body{flex:1;min-height:0;overflow-y:auto;padding:10px 12px;line-height:1.55;white-space:pre-wrap;word-break:break-word;cursor:text;outline:none}
+.p-out{color:#d1d5db}
+.p-err{color:#f87171}
+.p-dim{color:#7d8794}
+.p-accent{color:#22d3ee}
+.p-echo{color:#9aa4b2}
+.p-prompt-user{color:#4ade80}
+.p-prompt-path{color:#38bdf8}
+.p-prompt-gt{color:#facc15}
+.caret{background:#22d3ee;color:#06121a;padding:0 1px;border-radius:1px}
+.t-line{white-space:pre-wrap;word-break:break-word;min-height:1.55em}
+
+/* ============ PRZEGLĄDARKA ============ */
+.browser{flex:1;min-height:0;display:flex;flex-direction:column}
+.b-nav{display:flex;gap:5px;padding:7px;background:#10151d;border-bottom:1px solid #1d2530;align-items:center;flex:0 0 auto}
+.b-nav .tbtn{width:30px;padding:4px 0;text-align:center}
+.b-addr{flex:1;display:flex;gap:6px;background:#0b0e14;border:1px solid #232b3a;border-radius:8px;padding:4px 8px;align-items:center;min-width:0}
+.b-sec{font-size:11px;flex:0 0 auto}
+.b-addr input{flex:1;background:transparent;border:0;color:#e5e7eb;font-size:12.5px;outline:none;padding:3px 0;min-width:0}
+.b-frame{flex:1;min-height:0;background:#fff}
+.b-frame iframe{width:100%;height:100%;border:0;background:#fff}
+.b-quick{display:flex;gap:6px;padding:6px 8px;background:#0d1117;border-top:1px solid #1d2530;flex-wrap:wrap;flex:0 0 auto}
+.b-quick button{font-size:11.5px;padding:3px 10px;border-radius:999px;background:#151b26;color:#9aa4b2;border:1px solid #232b3a;cursor:pointer}
+.b-quick button:hover{color:#fff;border-color:#3b4a63}
+.b-note{font-size:10.5px;color:#5b6472;padding:5px 10px;background:#0d1117;flex:0 0 auto}
+
+/* ============ PLIKI ============ */
+.files{flex:1;min-height:0;display:flex;flex-direction:column}
+.f-toolbar{display:flex;align-items:center;gap:6px;padding:8px 10px;background:#10151d;border-bottom:1px solid #1d2530;flex:0 0 auto;flex-wrap:wrap}
+.f-crumb{display:flex;align-items:center;gap:1px;overflow:hidden;white-space:nowrap;font-size:12px;color:#8b93a3}
+.f-crumb button{background:transparent;border:0;color:#9aa4b2;cursor:pointer;font-size:12px;padding:3px 5px;border-radius:6px}
+.f-crumb button:hover{background:#1d2736;color:#fff}
+.f-crumb .crumb-sep{color:#4b5563}
+.f-list{flex:1;min-height:0;overflow-y:auto}
+.f-row{display:flex;align-items:center;gap:10px;padding:7px 12px;border-bottom:1px solid #141a24;cursor:pointer;font-size:13px;user-select:none}
+.f-row:hover{background:#131a26}
+.f-row.sel{background:#1b2838;outline:1px solid #2e3d5c}
+.f-row .f-ico{font-size:15px;width:20px;text-align:center}
+.f-row .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#d7dce4}
+.f-row .sz{color:#6b7280;font-size:11.5px;flex:0 0 auto}
+.f-empty{padding:34px;text-align:center;color:#6b7280;font-size:13px}
+
+/* ============ EDYTOR ============ */
+.editor{flex:1;min-height:0;display:flex;flex-direction:column}
+.ed-toolbar{display:flex;align-items:center;gap:6px;padding:7px 9px;background:#10151d;border-bottom:1px solid #1d2530;flex:0 0 auto;flex-wrap:wrap}
+.ed-path{flex:1;min-width:140px;background:#0b0e14;border:1px solid #232b3a;border-radius:7px;color:#e5e7eb;font-size:12px;padding:5px 8px;outline:none;font-family:ui-monospace,Consolas,monospace}
+.ed-path:focus{border-color:#2e3d5c}
+.editor textarea{flex:1;min-height:0;background:#0a0d12;color:#d1d5db;border:0;resize:none;padding:12px;font-family:'Cascadia Code','JetBrains Mono',Consolas,monospace;font-size:13px;outline:none;white-space:pre;overflow:auto;line-height:1.6}
+
+/* ============ O SYSTEMIE ============ */
+.about{flex:1;min-height:0;overflow-y:auto;padding:22px;background:linear-gradient(170deg,#10151d,#0d1117)}
+.a-logo{font-size:52px;text-align:center;filter:drop-shadow(0 0 16px rgba(34,211,238,.35))}
+.a-name{text-align:center;font-size:30px;font-weight:800;letter-spacing:1.5px;background:linear-gradient(90deg,#22d3ee,#818cf8);-webkit-background-clip:text;background-clip:text;color:transparent;margin-top:4px}
+.a-ver{font-size:14px;color:#8b93a3;font-weight:600}
+.a-sub{text-align:center;color:#9aa4b2;font-size:13px;margin-top:2px}
+.a-list{margin:18px 0 0;padding:0 4px;list-style:none;font-size:13px;color:#d7dce4;display:flex;flex-direction:column;gap:8px}
+.a-info{margin-top:18px;padding:12px 14px;background:#0b0e14;border:1px solid #1d2530;border-radius:10px;font-size:11.5px;color:#8b93a3;line-height:1.7;word-break:break-all}
+.a-note{margin-top:10px;font-size:11.5px;color:#6b7280;line-height:1.6}
+
+/* ============ TAPETA ============ */
+.wp-picker{flex:1;min-height:0;overflow-y:auto;padding:16px}
+.wp-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.wp-item{height:76px;border-radius:10px;border:2px solid transparent;cursor:pointer;display:flex;align-items:flex-end;padding:8px;color:#fff;font-size:12px;font-weight:600;text-shadow:0 1px 3px rgba(0,0,0,.7)}
+.wp-item:hover{border-color:#22d3ee}
+.wp-hint{margin-top:14px;font-size:11.5px;color:#6b7280}
+
+/* ============ POWIADOMIENIA ============ */
+#toasts{position:fixed;right:14px;bottom:calc(var(--taskbar-h) + 14px);display:flex;flex-direction:column;gap:8px;z-index:99997}
+.toast{background:rgba(17,22,31,.97);border:1px solid #24304a;border-left:3px solid var(--accent);border-radius:10px;padding:10px 14px;min-width:240px;max-width:340px;box-shadow:0 8px 30px rgba(0,0,0,.5);font-size:12.5px;animation:tin .25s ease;cursor:pointer}
+.toast .t-title{font-weight:600;margin-bottom:2px;color:#e5e7eb}
+.toast .t-body{color:#9aa4b2;word-break:break-word}
+@keyframes tin{from{transform:translateX(30px);opacity:0}}
+
+/* ============ EKRAN STARTU / WYŁĄCZANIA ============ */
+#boot{position:fixed;inset:0;background:#04070c;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;transition:opacity .5s}
+#boot.fade{opacity:0;pointer-events:none}
+.boot-logo{display:flex;align-items:center;gap:14px}
+.boot-logo .snake{font-size:56px;filter:drop-shadow(0 0 18px rgba(34,211,238,.5))}
+.boot-logo .name{font-size:40px;font-weight:800;letter-spacing:2px;background:linear-gradient(90deg,#22d3ee,#818cf8);-webkit-background-clip:text;background-clip:text;color:transparent}
+.boot-tag{color:#8b93a3;font-size:12.5px;letter-spacing:.5px}
+.boot-bar{width:320px;max-width:80vw;height:6px;background:#101720;border-radius:99px;overflow:hidden}
+.boot-fill{height:100%;width:0%;background:linear-gradient(90deg,#22d3ee,#818cf8);transition:width .25s}
+#boot-log{width:440px;max-width:88vw;font-family:ui-monospace,Consolas,monospace;font-size:11.5px;color:#4ade80;min-height:120px;white-space:pre-wrap;line-height:1.7}
+#boot-log .warn{color:#fbbf24}
+#boot-log .err{color:#f87171}
+#off{position:fixed;inset:0;background:#000;z-index:99998;display:none;flex-direction:column;align-items:center;justify-content:center;gap:16px;color:#94a3b8}
+.off-icon{font-size:64px;filter:drop-shadow(0 0 22px rgba(148,163,184,.4))}
+.off-title{font-size:22px;font-weight:700;color:#e5e7eb}
+.off-sub{font-size:12.5px;color:#64748b}
+.off-btn{margin-top:8px;padding:10px 22px;border:0;border-radius:9px;background:linear-gradient(135deg,#0891b2,#4f46e5);color:#fff;font-weight:600;cursor:pointer;font-size:13.5px}
+.off-btn:hover{filter:brightness(1.12)}
+</style>
+</head>
+<body>
+
+<div id="desktop"></div>
+
+<div id="taskbar">
+  <button id="start-btn" title="Menu Start">🐍 <span>PyOS</span></button>
+  <div id="tb-wins"></div>
+  <div id="tb-clock"><span class="ck-time">--:--</span><span class="ck-date">--.--.----</span></div>
+</div>
+
+<div id="start-menu">
+  <div class="sm-title">🐍 PyOS 1.0</div>
+  <div class="sm-item" data-app="terminal"><span class="si">🐍</span><span>Terminal Python</span></div>
+  <div class="sm-item" data-app="browser"><span class="si">🌐</span><span>Przeglądarka</span></div>
+  <div class="sm-item" data-app="files"><span class="si">📁</span><span>Pliki</span></div>
+  <div class="sm-item" data-app="editor"><span class="si">📝</span><span>Edytor</span></div>
+  <div class="sm-item" data-app="about"><span class="si">ℹ️</span><span>O PyOS</span></div>
+  <div class="sm-sep"></div>
+  <div class="sm-item sm-danger" data-act="reboot"><span class="si">⟳</span><span>Zrestartuj system</span></div>
+  <div class="sm-item sm-danger" data-act="off"><span class="si">⏻</span><span>Wyłącz system</span></div>
+</div>
+
+<div id="toasts"></div>
+
+<div id="boot">
+  <div class="boot-logo"><span class="snake">🐍</span><span class="name">PyOS</span></div>
+  <div class="boot-tag">MINI SYSTEM W PRZEGLĄDARCE · PYTHON NA POKŁADZIE</div>
+  <div class="boot-bar"><div class="boot-fill" id="boot-fill"></div></div>
+  <div id="boot-log"></div>
+</div>
+
+<div id="off">
+  <div class="off-icon">⏻</div>
+  <div class="off-title">PyOS — system wyłączony</div>
+  <div class="off-sub">Twoje pliki pozostały zapisane w tej przeglądarce.</div>
+  <button id="off-on" class="off-btn">Włącz ponownie</button>
+</div>
+
+<noscript><p style="color:#fff;padding:20px">PyOS wymaga włączonego JavaScriptu.</p></noscript>
+
+<script>
+'use strict';
+/* ================================================================
+   PyOS 1.0 — mini system operacyjny w przeglądarce
+   Terminal z Pythonem 3 (Pyodide/WebAssembly) jako głównym językiem,
+   przeglądarka, menedżer plików, edytor, okna, pasek zadań.
+   ================================================================ */
+
+// ---------- KONFIGURACJA ----------
+const PYODIDE_JS    = 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js';
+const PYODIDE_IDX   = 'https://cdn.jsdelivr.net/pyodide/v0.26.4/full/';
+const PYODIDE_JS_ALT = 'https://unpkg.com/pyodide@0.26.4/full/pyodide.js';
+const PYODIDE_IDX_ALT= 'https://unpkg.com/pyodide@0.26.4/full/';
+const HOME_DIR      = '/home/user';
+const FS_KEY        = 'pyos-fs-v1';
+const WP_KEY        = 'pyos-wp';
+const WALLPAPERS    = ['aurora','ocean','sunset','night','matrix','mono'];
+const HOME_PAGE     = 'https://pl.wikipedia.org';
+
+// ---------- STAN ----------
+const state = {
+  pyodide: null, ns: null, pyFn: {}, pyReady: false, pyError: false,
+  pythonVersion: '—', interrupt: null,
+  wins: new Map(), focused: null, termOwner: null,
+  termRec: null, filesRec: null, aboutRec: null,
+  wp: 'aurora',
+};
+let zTop = 100;
+let winSeq = 0;
+let openWinCount = 0;
+let runQueue = Promise.resolve();
+let stdinResolve = null;
+const termSessions = new Map();   // recId -> {rec, body, head, lineEl, buf, cursor, codeBuf, pending, busy, inputMode, hist, hi}
+const desktopEl = document.getElementById('desktop');
+
+// ---------- NARZĘDZIA ----------
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const basename = p => { const parts = String(p).split('/').filter(Boolean); return parts.length ? parts[parts.length-1] : '/'; };
+function dirname(p){ const i = String(p).lastIndexOf('/'); return i <= 0 ? '/' : String(p).slice(0, i) || '/'; }
+function fmtSize(b){ if (b < 1024) return b + ' B'; if (b < 1048576) return (b/1024).toFixed(1) + ' KB'; return (b/1048576).toFixed(1) + ' MB'; }
+function isBinary(bytes){ const n = Math.min(bytes.length, 2048); for (let i = 0; i < n; i++) if (bytes[i] === 0) return true; return false; }
+function bytesToB64(bytes){ let s = ''; const CH = 0x8000; for (let i = 0; i < bytes.length; i += CH) s += String.fromCharCode.apply(null, bytes.subarray(i, i+CH)); return btoa(s); }
+function b64ToBytes(b64){ const bin = atob(b64); const out = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i); return out; }
+function resolvePath(p){ p = String(p).trim(); if (!p) return null; if (!p.startsWith('/')) p = HOME_DIR + '/' + p; return p; }
+function mkdirTree(p){
+  const parts = p.split('/').filter(Boolean);
+  let cur = '';
+  for (const seg of parts){ cur += '/' + seg; try { state.pyodide.FS.stat(cur); } catch(e){ state.pyodide.FS.mkdir(cur); } }
+}
+function wipeDir(p){
+  try {
+    const names = state.pyodide.FS.readdir(p).filter(n => n !== '.' && n !== '..');
+    for (const n of names){
+      const c = p + '/' + n;
+      const st = state.pyodide.FS.stat(c);
+      if (state.pyodide.FS.isDir(st.mode)) wipeDir(c); else state.pyodide.FS.unlink(c);
+    }
+    state.pyodide.FS.rmdir(p);
+  } catch(e){}
+}
+
+// ---------- POWIADOMIENIA (TOAST) ----------
+function toast(msg, title){
+  const box = document.getElementById('toasts');
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.innerHTML = '<div class="t-title">' + esc(title || 'PyOS') + '</div><div class="t-body">' + esc(msg) + '</div>';
+  t.addEventListener('click', () => t.remove());
+  box.appendChild(t);
+  setTimeout(() => { t.style.transition = 'opacity .4s'; t.style.opacity = '0'; setTimeout(() => t.remove(), 420); }, 4500);
+}
+
+// ---------- MENU KONTEKSTOWE ----------
+let ctxEl = null;
+function closeCtx(){ if (ctxEl){ ctxEl.remove(); ctxEl = null; } }
+function showCtx(x, y, items){
+  closeCtx();
+  ctxEl = document.createElement('div');
+  ctxEl.id = 'ctx';
+  items.forEach(it => {
+    if (it === null){ const s = document.createElement('div'); s.className = 'ctx-sep'; ctxEl.appendChild(s); return; }
+    const d = document.createElement('div');
+    d.className = 'ctx-i';
+    d.textContent = it.label;
+    if (it.hint){ const h = document.createElement('span'); h.className = 'ctx-hint'; h.textContent = it.hint; d.appendChild(h); }
+    d.addEventListener('click', () => { closeCtx(); it.fn(); });
+    ctxEl.appendChild(d);
+  });
+  document.body.appendChild(ctxEl);
+  const r = ctxEl.getBoundingClientRect();
+  ctxEl.style.left = Math.max(4, Math.min(x, innerWidth - r.width - 8)) + 'px';
+  ctxEl.style.top  = Math.max(4, Math.min(y, innerHeight - r.height - 8)) + 'px';
+}
+document.addEventListener('mousedown', e => { if (ctxEl && !ctxEl.contains(e.target)) closeCtx(); });
+
+// ---------- ZEGAR ----------
+function tickClock(){
+  const now = new Date();
+  const el = document.getElementById('tb-clock');
+  el.querySelector('.ck-time').textContent = now.toLocaleTimeString('pl-PL', {hour:'2-digit', minute:'2-digit'});
+  el.querySelector('.ck-date').textContent = now.toLocaleDateString('pl-PL', {day:'2-digit', month:'2-digit', year:'numeric'});
+  el.title = now.toLocaleString('pl-PL');
+}
+setInterval(tickClock, 1000);
+tickClock();
+
+// ---------- MENU START ----------
+const smEl = document.getElementById('start-menu');
+document.getElementById('start-btn').addEventListener('click', e => { e.stopPropagation(); smEl.style.display = smEl.style.display === 'block' ? 'none' : 'block'; });
+smEl.querySelectorAll('.sm-item[data-app]').forEach(it => it.addEventListener('click', () => { smEl.style.display = 'none'; openApp(it.dataset.app); }));
+smEl.querySelector('.sm-item[data-act="reboot"]').addEventListener('click', () => { smEl.style.display = 'none'; reboot(); });
+smEl.querySelector('.sm-item[data-act="off"]').addEventListener('click', () => { smEl.style.display = 'none'; shutdown(); });
+document.addEventListener('mousedown', e => {
+  if (smEl.style.display === 'block' && !smEl.contains(e.target) && !e.target.closest('#start-btn')) smEl.style.display = 'none';
+});
+
+// ---------- TAPETA ----------
+function setWallpaper(name){
+  if (!WALLPAPERS.includes(name)){ toast('Nieznana tapeta: ' + name, 'Pulpit'); return; }
+  state.wp = name;
+  try { localStorage.setItem(WP_KEY, name); } catch(e){}
+  const d = document.getElementById('desktop');
+  d.className = d.className.replace(/\bwp-\w+/g, '').trim() + ' wp-' + name;
+}
+function openWallpapers(){
+  const grid = WALLPAPERS.map(id => '<button class="wp-item wp-prev-' + id + '" data-wp="' + id + '"><span>' + id + '</span></button>').join('');
+  const rec = createWindow({ app:'wallpapers', title:'Tapeta', icon:'🎨', w:440, h:330,
+    content: '<div class="wp-picker"><div class="wp-grid">' + grid + '</div><div class="wp-hint">Kliknij miniaturę, aby zmienić tapetę pulpitu.</div></div>' });
+  rec.win.querySelectorAll('[data-wp]').forEach(b => b.addEventListener('click', () => {
+    setWallpaper(b.dataset.wp);
+    toast('Ustawiono tapetę: ' + b.dataset.wp, 'Pulpit');
+  }));
+}
+
+// ---------- IKONY PULPITU ----------
+function buildDesktop(){
+  const icons = [
+    ['terminal','🐍','Terminal Python'],
+    ['browser','🌐','Przeglądarka'],
+    ['files','📁','Pliki'],
+    ['editor','📝','Edytor'],
+    ['about','ℹ️','O PyOS'],
+  ];
+  icons.forEach(([id, ico, lbl], i) => {
+    const el = document.createElement('div');
+    el.className = 'd-icon';
+    el.style.left = '16px';
+    el.style.top = (16 + i * 96) + 'px';
+    el.innerHTML = '<span class="ico">' + ico + '</span><span class="lbl">' + esc(lbl) + '</span>';
+    el.addEventListener('click', e => { e.stopPropagation(); selectIcon(el); });
+    el.addEventListener('dblclick', () => openApp(id));
+    desktopEl.appendChild(el);
+  });
+}
+function selectIcon(el){
+  desktopEl.querySelectorAll('.d-icon.selected').forEach(x => x.classList.remove('selected'));
+  if (el) el.classList.add('selected');
+}
+desktopEl.addEventListener('mousedown', e => {
+  if (e.target.closest('.window')) return;
+  selectIcon(null); closeCtx();
+  if (smEl.style.display === 'block') smEl.style.display = 'none';
+  blurAll();
+});
+desktopEl.addEventListener('contextmenu', e => {
+  if (e.target.closest('.window')) return;
+  e.preventDefault();
+  showCtx(e.clientX, e.clientY, [
+    { label:'Nowy folder…', fn: () => {
+        const n = prompt('Nazwa folderu:', 'nowy folder');
+        if (!n) return;
+        if (!state.pyReady) return;
+        mkdirTree(HOME_DIR + '/Desktop/' + n.trim());
+        toast('Utworzono folder', 'Pulpit');
+        saveFSDebounced(); refreshFilesIfOpen();
+    }},
+    { label:'Nowy plik…', fn: () => {
+        const n = prompt('Nazwa pliku:', 'nowy.txt');
+        if (!n || !state.pyReady) return;
+        mkdirTree(HOME_DIR + '/Desktop');
+        try { state.pyodide.FS.writeFile(HOME_DIR + '/Desktop/' + n.trim(), ''); toast('Utworzono plik', 'Pulpit'); saveFSDebounced(); refreshFilesIfOpen(); }
+        catch(e){ toast('Nie udało się utworzyć pliku', 'Pulpit'); }
+    }},
+    null,
+    { label:'Zmień tapetę…', fn: openWallpapers },
+  ]);
+});
+
+// ---------- MENEDŻER OKIEN ----------
+function blurAll(){
+  state.focused = null;
+  state.wins.forEach(r => { r.win.classList.remove('focused'); if (r.btn) r.btn.classList.remove('active'); });
+}
+function focusWin(win){
+  const rec = state.wins.get(win.dataset.rec);
+  if (!rec) return;
+  state.focused = rec;
+  state.wins.forEach(r => {
+    if (r === rec){ r.win.style.zIndex = ++zTop; r.win.classList.add('focused'); if (r.btn) r.btn.classList.add('active'); }
+    else { r.win.classList.remove('focused'); if (r.btn) r.btn.classList.remove('active'); }
+  });
+  if (rec.app === 'terminal'){ const t = termSessions.get(rec.id); if (t && t.body) { try { t.body.focus(); } catch(e){} } }
+}
+function createWindow(opt){
+  const win = document.createElement('div');
+  win.className = 'window';
+  win.dataset.app = opt.app || '';
+  const n = openWinCount++;
+  const w = opt.w || 640, h = opt.h || 440;
+  const x = opt.x != null ? opt.x : 60 + (n % 8) * 26;
+  const y = opt.y != null ? opt.y : 36 + (n % 8) * 22;
+  win.style.cssText = 'left:' + x + 'px;top:' + y + 'px;width:' + w + 'px;height:' + h + 'px;z-index:' + (++zTop);
+  win.innerHTML =
+    '<div class="win-titlebar">' +
+      '<span class="win-ico">' + (opt.icon || '🪟') + '</span>' +
+      '<span class="win-title">' + esc(opt.title || 'Okno') + '</span>' +
+      '<span class="win-btns">' +
+        '<button class="wb wb-min" title="Minimalizuj">—</button>' +
+        '<button class="wb wb-max" title="Maksymalizuj">▢</button>' +
+        '<button class="wb wb-close" title="Zamknij">✕</button>' +
+      '</span>' +
+    '</div>' +
+    '<div class="win-body">' + (opt.content || '') + '</div>' +
+    '<div class="win-resize"></div>';
+  desktopEl.appendChild(win);
+  const rec = { win, id: 'win' + (++winSeq), app: opt.app, btn: null, onClose: opt.onClose || null };
+  win.dataset.rec = rec.id;
+  state.wins.set(rec.id, rec);
+  const tb = document.getElementById('tb-wins');
+  rec.btn = document.createElement('button');
+  rec.btn.className = 'tb-win';
+  rec.btn.innerHTML = '<span class="ti">' + (opt.icon || '🪟') + '</span><span class="tl">' + esc(opt.title || 'Okno') + '</span>';
+  rec.btn.title = opt.title || 'Okno';
+  rec.btn.addEventListener('click', () => {
+    if (win.style.display === 'none') restoreWin(rec);
+    else if (state.focused === rec) minimizeWin(rec);
+    else focusWin(win);
+  });
+  tb.appendChild(rec.btn);
+  const tbEl = win.querySelector('.win-titlebar');
+  tbEl.addEventListener('mousedown', e => onTitleDown(win, e));
+  tbEl.addEventListener('dblclick', e => { if (!e.target.closest('.wb')) toggleMax(win); });
+  win.querySelector('.win-resize').addEventListener('mousedown', e => onResizeDown(win, e));
+  win.addEventListener('mousedown', () => focusWin(win));
+  win.querySelector('.wb-min').addEventListener('click', e => { e.stopPropagation(); minimizeWin(rec); });
+  win.querySelector('.wb-max').addEventListener('click', e => { e.stopPropagation(); toggleMax(win); });
+  win.querySelector('.wb-close').addEventListener('click', e => { e.stopPropagation(); closeWin(rec); });
+  focusWin(win);
+  return rec;
+}
+function setWinTitle(rec, title){
+  rec.win.querySelector('.win-title').textContent = title;
+  if (rec.btn){ rec.btn.querySelector('.tl').textContent = title; rec.btn.title = title; }
+}
+function onTitleDown(win, e){
+  if (e.target.closest('.wb')) return;
+  if (e.button !== 0) return;
+  if (win.dataset.max === '1') return;
+  e.preventDefault();
+  const sx = e.clientX, sy = e.clientY, ox = win.offsetLeft, oy = win.offsetTop;
+  document.body.classList.add('dragging');
+  const move = ev => {
+    const nx = ox + (ev.clientX - sx), ny = oy + (ev.clientY - sy);
+    win.style.left = Math.max(-(win.offsetWidth - 90), Math.min(nx, desktopEl.clientWidth - 90)) + 'px';
+    win.style.top  = Math.max(0, Math.min(ny, desktopEl.clientHeight - 34)) + 'px';
+  };
+  const up = () => { document.body.classList.remove('dragging'); document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); };
+  document.addEventListener('mousemove', move);
+  document.addEventListener('mouseup', up);
+}
+function onResizeDown(win, e){
+  if (win.dataset.max === '1') return;
+  e.preventDefault();
+  e.stopPropagation();
+  focusWin(win);
+  document.body.classList.add('dragging');
+  const sx = e.clientX, sy = e.clientY, ow = win.offsetWidth, oh = win.offsetHeight;
+  const move = ev => {
+    win.style.width  = Math.max(340, ow + (ev.clientX - sx)) + 'px';
+    win.style.height = Math.max(220, oh + (ev.clientY - sy)) + 'px';
+  };
+  const up = () => { document.body.classList.remove('dragging'); document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); };
+  document.addEventListener('mousemove', move);
+  document.addEventListener('mouseup', up);
+}
+function toggleMax(win){
+  if (win.dataset.max === '1'){
+    const r = JSON.parse(win.dataset.prev);
+    win.style.left = r.l + 'px'; win.style.top = r.t + 'px';
+    win.style.width = r.w + 'px'; win.style.height = r.h + 'px';
+    win.dataset.max = '0';
+    win.querySelector('.wb-max').textContent = '▢';
+  } else {
+    win.dataset.prev = JSON.stringify({l: win.offsetLeft, t: win.offsetTop, w: win.offsetWidth, h: win.offsetHeight});
+    win.style.left = '0px'; win.style.top = '0px';
+    win.style.width = desktopEl.clientWidth + 'px';
+    win.style.height = desktopEl.clientHeight + 'px';
+    win.dataset.max = '1';
+    win.querySelector('.wb-max').textContent = '❐';
+  }
+}
+function minimizeWin(rec){ rec.win.style.display = 'none'; if (rec.btn) rec.btn.classList.remove('active'); }
+function restoreWin(rec){ rec.win.style.display = ''; focusWin(rec.win); }
+function closeWin(rec){
+  if (rec.onClose){ try { rec.onClose(); } catch(e){} }
+  state.wins.delete(rec.id);
+  rec.win.remove();
+  if (rec.btn) rec.btn.remove();
+  if (state.focused === rec) state.focused = null;
+}
+function closeAllWindows(){
+  [...state.wins.values()].forEach(r => closeWin(r));
+  state.wins.clear();
+}
+
+// ---------- OBSŁUGA APLIKACJI ----------
+function openApp(id, arg){
+  if (id === 'terminal'){
+    if (state.termRec && state.wins.get(state.termRec.id)) restoreWin(state.termRec);
+    else createTerminal();
+  } else if (id === 'files'){
+    if (state.filesRec && state.wins.get(state.filesRec.id)) restoreWin(state.filesRec);
+    else createFiles();
+  } else if (id === 'about'){
+    if (state.aboutRec && state.wins.get(state.aboutRec.id)) restoreWin(state.aboutRec);
+    else createAbout();
+  } else if (id === 'browser'){
+    createBrowser(arg && arg.url);
+  } else if (id === 'editor'){
+    createEditor(arg && arg.path);
+  } else if (id === 'wallpapers'){
+    openWallpapers();
+  }
+}
+
+// ================================================================
+//  PYTHON (PYODIDE)
+// ================================================================
+const PY_INIT = String.raw`import os, sys, re, ast, codeop, traceback, builtins
+import pyos
+
+HOME = '/home/user'
+
+def pyos_compile_check(code):
+    try:
+        r = codeop.compile_command(code, '<repl>', 'exec')
+    except (SyntaxError, OverflowError, ValueError):
+        return 'error'
+    return 'incomplete' if r is None else 'ok'
+
+def pyos_run_block(code):
+    try:
+        tree = ast.parse(code, '<repl>', 'exec')
+        if tree.body and isinstance(tree.body[-1], ast.Expr):
+            rest = tree.body[:-1]
+            last = tree.body[-1]
+            if rest:
+                exec(compile(ast.Module(body=rest, type_ignores=[]), '<repl>', 'exec'), globals())
+            val = eval(compile(ast.Expression(body=last.value), '<repl>', 'eval'), globals())
+            if val is not None:
+                print(repr(val))
+        else:
+            exec(compile(code, '<repl>', 'exec'), globals())
+    except (SystemExit, KeyboardInterrupt):
+        pass
+    except BaseException:
+        traceback.print_exc()
+
+def pyos_complete(text):
+    m = re.search(r'([A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)*)$', text)
+    if not m:
+        return []
+    token = m.group(1)
+    try:
+        from rlcompleter import Completer
+        comp = Completer(globals())
+    except Exception:
+        return []
+    out = []
+    for i in range(200):
+        c = comp.complete(token, i)
+        if c is None:
+            break
+        out.append(c)
+    return out
+
+# ---- podstawowe komendy plikowe (pelny Python + wirtualny dysk) ----
+def ls(path='.'):
+    for n in sorted(os.listdir(path)):
+        full = os.path.join(path, n)
+        print(n + ('/' if os.path.isdir(full) else ''))
+
+def cat(path):
+    with open(path, encoding='utf-8', errors='replace') as f:
+        print(f.read(), end='')
+
+def mkdir(path):
+    os.makedirs(path, exist_ok=True)
+
+def touch(path):
+    open(path, 'a').close()
+
+def rm(path):
+    if os.path.isdir(path):
+        import shutil
+        shutil.rmtree(path)
+    else:
+        os.remove(path)
+
+def clear():
+    pyos.clear_term()
+
+_orig_input = builtins.input
+def input(prompt=''):
+    try:
+        return _orig_input(prompt)
+    except EOFError:
+        raise KeyboardInterrupt
+builtins.input = input
+
+def help():
+    print('''KOMENDY SYSTEMOWE PyOS
+  help()                  - ta pomoc
+  clear()                 - wyczysc ekran terminala
+  ls([sciezka])           - lista plikow w katalogu
+  cat(sciezka)            - wypisz zawartosc pliku
+  mkdir(sciezka)          - utworz katalog
+  touch(sciezka)          - utworz pusty plik
+  rm(sciezka)             - usun plik/katalog
+  open_url('https://...') - otworz strone w przegladarce
+  search('zapytanie')     - wyszukaj w Wikipedii
+  editor([sciezka])       - otworz edytor tekstu
+  files()                 - otworz menedzer plikow
+  notify('wiadomosc')     - pokaz powiadomienie
+  wallpaper('nazwa')      - zmien tapete (aurora/ocean/sunset/night/matrix/mono)
+  sys_info()              - informacje o systemie
+  shutdown()              - wylacz system
+  reboot()                - uruchom ponownie
+
+To pelny Python 3: listy, klasy, importy, petle - Python jest glownym jezykiem terminala.
+Przyklad:  for i in range(3): print('PyOS', i)''')
+
+# ---- funkcje systemowe z modulu pyos (implementacja w JS) ----
+for _n in ('open_url','search','open_app','notify','wallpaper','sys_info',
+           'shutdown','reboot','files','editor','time','clear_term'):
+    globals()[_n] = getattr(pyos, _n)
+
+# ---- przygotowanie katalogu domowego ----
+for _d in ('Desktop', 'Dokumenty', 'Obrazy', 'Muzyka'):
+    os.makedirs(os.path.join(HOME, _d), exist_ok=True)
+
+if not os.path.exists(os.path.join(HOME, 'hello.py')):
+    with open(os.path.join(HOME, 'hello.py'), 'w') as f:
+        f.write('''# Przykladowy program PyOS
+def hello(imie="PyOS"):
+    return "Witaj, " + imie + "!"
+
+print(hello())
+print("Python w przegladarce dziala :)")
+''')
+
+if not os.path.exists(os.path.join(HOME, 'README.txt')):
+    with open(os.path.join(HOME, 'README.txt'), 'w') as f:
+        f.write('PyOS - mini system w przegladarce\n\nPliki zapisane w tym systemie sa przechowywane w localStorage przegladarki.\nUruchom przyklad:  exec(open("hello.py").read())\n')
+
+os.chdir(HOME)
+`;
+
+const pyosModule = {
+  NAME: 'PyOS',
+  open_url(u){ openApp('browser', { url: String(u) }); },
+  search(q){ openApp('browser', { url: 'https://pl.wikipedia.org/w/index.php?search=' + encodeURIComponent(String(q)) }); },
+  open_app(name){ openApp(String(name)); },
+  notify(msg, title){ toast(String(msg), title == null ? 'PyOS' : String(title)); },
+  wallpaper(name){ setWallpaper(String(name)); },
+  sys_info(){
+    return {
+      system: 'PyOS 1.0',
+      python: state.pythonVersion,
+      pyodide: state.pyodide ? state.pyodide.version : '—',
+      platform: String(navigator.platform || '—'),
+      browser: String(navigator.userAgent),
+      screen: screen.width + 'x' + screen.height,
+      home: HOME_DIR,
+    };
+  },
+  shutdown(){ shutdown(); },
+  reboot(){ reboot(); },
+  files(){ openApp('files'); },
+  editor(p){ openApp('editor', { path: p == null ? null : String(p) }); },
+  time(){ return new Date().toLocaleString('pl-PL'); },
+  clear_term(){ const t = activeTerm(); if (t) termClear(t); },
+};
+
+function loadScript(src){
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = () => res();
+    s.onerror = () => rej(new Error('Nie udało się pobrać ' + src));
+    document.head.appendChild(s);
+  });
+}
+
+function stdinLine(){
+  return new Promise(res => {
+    const t = activeTerm();
+    state.stdinResolve = res;
+    if (t){ t.inputMode = true; termRenderLine(t); }
+  });
+}
+function finishStdin(textOrNull){
+  const r = state.stdinResolve;
+  if (!r) return;
+  state.stdinResolve = null;
+  const t = activeTerm();
+  if (t) t.inputMode = false;
+  r(textOrNull);
+}
+
+function termWrite(text, cls){
+  const t = state.termOwner;
+  if (!t || !t.body || !t.body.isConnected){ console.log('[pyos]', text); return; }
+  termAppend(t, text, cls);
+}
+
+async function loadPython(){
+  if (state.pyodide) return initPython();
+  let idx = PYODIDE_IDX;
+  try { await loadScript(PYODIDE_JS); }
+  catch(e){
+    await loadScript(PYODIDE_JS_ALT);
+    idx = PYODIDE_IDX_ALT;
+  }
+  state.pyodide = await loadPyodide({ indexURL: idx });
+  return initPython();
+}
+
+async function initPython(){
+  const p = state.pyodide;
+  if (!p) return false;
+  state.pyReady = false;
+  state.pyError = false;
+  p.setStdout({ batched: s => termWrite(s, 'p-out') });
+  p.setStderr({ batched: s => termWrite(s, 'p-err') });
+  p.setStdin({ stdin: () => stdinLine() });
+  const ns = p.runPython('{}');
+  try { p.registerJsModule('pyos', pyosModule); } catch(e){ console.warn(e); }
+  await p.runPythonAsync(PY_INIT, { globals: ns });
+  state.ns = ns;
+  state.pyFn = {
+    runBlock: ns.get('pyos_run_block'),
+    compileCheck: ns.get('pyos_compile_check'),
+    complete: ns.get('pyos_complete'),
+  };
+  try { state.pythonVersion = p.runPython('import sys; sys.version.split()[0]'); } catch(e){ state.pythonVersion = '?'; }
+  try {
+    const buf = new Uint8Array(new SharedArrayBuffer(1));
+    p.setInterruptBuffer(buf);
+    state.interrupt = buf;
+  } catch(e){ state.interrupt = null; }
+  restoreFS();
+  state.pyReady = true;
+  termSessions.forEach(t => { printBanner(t); termRenderLine(t); });
+  updateTermHead();
+  return true;
+}
+
+async function restartPython(){
+  let busy = false;
+  termSessions.forEach(t => { if (t.busy) busy = true; });
+  if (busy){ toast('Poczekaj, aż Python skończy wykonywanie programu.', 'PyOS'); return; }
+  termSessions.forEach(t => termAppend(t, '\n⟳ Restart środowiska Python…', 'p-dim'));
+  updateTermHead();
+  try {
+    const ok = await (state.pyodide ? initPython() : loadPython());
+    if (ok){
+      termSessions.forEach(t => { termAppend(t, '✓ Python ' + state.pythonVersion + ' gotowy.', 'p-dim'); termRenderLine(t); });
+      toast('Środowisko Python gotowe', 'PyOS');
+    } else {
+      state.pyError = true;
+      updateTermHead();
+      termSessions.forEach(t => termAppend(t, '✗ Nie udało się załadować Pythona (brak internetu?).', 'p-err'));
+    }
+  } catch(e){
+    state.pyError = true;
+    updateTermHead();
+    termSessions.forEach(t => termAppend(t, '✗ Błąd: ' + (e && e.message ? e.message : e), 'p-err'));
+  }
+}
+
+// ---------- WIRTUALNY DYSK (persystencja) ----------
+function fsWalk(dir){
+  const out = [];
+  let names;
+  try { names = state.pyodide.FS.readdir(dir); } catch(e){ return out; }
+  for (const name of names){
+    if (name === '.' || name === '..') continue;
+    const path = dir === '/' ? '/' + name : dir + '/' + name;
+    let st;
+    try { st = state.pyodide.FS.stat(path); } catch(e){ continue; }
+    if (state.pyodide.FS.isDir(st.mode)){
+      out.push({ name, type: 'dir', children: fsWalk(path) });
+    } else {
+      try {
+        const bytes = state.pyodide.FS.readFile(path);
+        out.push({ name, type: 'file', size: bytes.length, data: bytesToB64(bytes) });
+      } catch(e){}
+    }
+  }
+  return out;
+}
+function fsRestoreNode(node, path){
+  if (node.type === 'dir'){
+    mkdirTree(path);
+    (node.children || []).forEach(c => fsRestoreNode(c, path + '/' + c.name));
+  } else {
+    try { state.pyodide.FS.writeFile(path, b64ToBytes(node.data || '')); } catch(e){}
+  }
+}
+function restoreFS(){
+  if (!state.pyodide) return;
+  const raw = localStorage.getItem(FS_KEY);
+  if (!raw) return;
+  try {
+    const tree = JSON.parse(raw);
+    wipeDir(HOME_DIR);
+    mkdirTree(HOME_DIR);
+    fsRestoreNode(tree, HOME_DIR);
+  } catch(e){ console.warn('restoreFS:', e); }
+}
+function saveFS(){
+  if (!state.pyReady || !state.pyodide) return;
+  let tree;
+  try { tree = fsWalk(HOME_DIR); } catch(e){ return; }
+  try {
+    const json = JSON.stringify(tree);
+    if (json.length > 3500000){
+      toast('Dysk jest zbyt duży dla localStorage — pliki nie zostaną w całości zapisane.', 'PyOS');
+      return;
+    }
+    localStorage.setItem(FS_KEY, json);
+  } catch(e){
+    toast('Nie udało się zapisać dysku (limit pamięci przeglądarki).', 'PyOS');
+  }
+}
+let saveT = null;
+function saveFSDebounced(){ clearTimeout(saveT); saveT = setTimeout(saveFS, 800); }
+window.addEventListener('beforeunload', () => { try { saveFS(); } catch(e){} });
+
+// ================================================================
+//  TERMINAL (REPL Pythona)
+// ================================================================
+function activeTerm(){
+  if (state.termOwner) return state.termOwner;
+  if (state.focused) return termSessions.get(state.focused.id) || null;
+  return null;
+}
+function cwdShort(){
+  if (!state.pyReady || !state.pyodide) return '~';
+  try {
+    const cwd = state.pyodide.FS.cwd();
+    if (cwd === HOME_DIR) return '~';
+    if (cwd.startsWith(HOME_DIR + '/')) return '~' + cwd.slice(HOME_DIR.length);
+    return cwd;
+  } catch(e){ return '~'; }
+}
+function cwdPromptText(){ return 'user@pyos:' + cwdShort() + ' >>> '; }
+
+function printBanner(t){
+  termAppend(t, '', null);
+  termAppend(t, ' ██████╗ ██╗   ██╗ ██████╗ ███████╗', 'p-accent');
+  termAppend(t, ' ██╔══██╗╚██╗ ██╔╝██╔═══██╗██╔════╝', 'p-accent');
+  termAppend(t, ' ██████╔╝ ╚████╔╝ ██║   ██║███████╗', 'p-accent');
+  termAppend(t, ' ██╔═══╝   ╚██╔╝  ██║   ██║╚════██║', 'p-accent');
+  termAppend(t, ' ██║        ██║   ╚██████╔╝███████║', 'p-accent');
+  termAppend(t, ' ╚═╝        ╚═╝    ╚═════╝ ╚══════╝', 'p-accent');
+  termAppend(t, ' Python ' + state.pythonVersion + ' (Pyodide/WebAssembly) — główny język terminala.', 'p-dim');
+  termAppend(t, ' Wpisz help(), aby zobaczyć komendy systemowe.', 'p-dim');
+  termAppend(t, '', null);
+}
+function termAppend(t, text, cls){
+  if (text == null) text = '';
+  const parts = String(text).split('\n');
+  if (parts.length > 1 && parts[parts.length - 1] === '') parts.pop();
+  if (parts.length === 0) parts.push('');
+  for (const seg of parts){
+    const d = document.createElement('div');
+    if (cls) d.className = cls;
+    d.textContent = seg;
+    t.body.insertBefore(d, t.lineEl);
+  }
+  t.body.scrollTop = t.body.scrollHeight;
+}
+function termClear(t){
+  t.body.querySelectorAll('div:not(.t-line)').forEach(d => d.remove());
+  t.body.scrollTop = 0;
+  termRenderLine(t);
+}
+function termRenderLine(t){
+  let html;
+  if (t.busy && !t.inputMode){
+    html = '';
+  } else {
+    const prompt = t.inputMode ? '' :
+      (t.pending
+        ? '<span class="p-prompt-gt">...</span> '
+        : '<span class="p-prompt-user">user@pyos</span><span class="p-dim">:</span><span class="p-prompt-path">' + esc(cwdShort()) + '</span><span class="p-prompt-gt"> &gt;&gt;&gt;</span> ');
+    const before = esc(t.buf.slice(0, t.cursor));
+    const at = t.buf.charAt(t.cursor) || ' ';
+    const after = esc(t.buf.slice(t.cursor + 1));
+    html = prompt + before + '<span class="caret">' + (at === ' ' ? '&nbsp;' : esc(at)) + '</span>' + after;
+  }
+  t.lineEl.innerHTML = html;
+  t.body.scrollTop = t.body.scrollHeight;
+}
+function finalizeLineEl(t){
+  const c = t.lineEl.querySelector('.caret');
+  if (c) c.replaceWith(document.createTextNode(c.textContent === '\u00a0' ? ' ' : c.textContent));
+  t.lineEl.classList.remove('t-line');
+  t.lineEl.classList.add('p-echo');
+  t.lineEl = document.createElement('div');
+  t.lineEl.className = 't-line';
+  t.body.appendChild(t.lineEl);
+}
+function insertText(t, txt){
+  t.buf = t.buf.slice(0, t.cursor) + txt + t.buf.slice(t.cursor);
+  t.cursor += txt.length;
+  termRenderLine(t);
+}
+function histNav(t, d){
+  if (!t.hist.length) return;
+  if (d < 0){
+    if (t.hi < 0) t.hi = t.hist.length - 1;
+    else if (t.hi > 0) t.hi--;
+  } else {
+    if (t.hi < 0) return;
+    if (t.hi < t.hist.length - 1) t.hi++;
+    else t.hi = -1;
+  }
+  t.buf = t.hi < 0 ? '' : t.hist[t.hi];
+  t.cursor = t.buf.length;
+  termRenderLine(t);
+}
+function termTab(t){
+  if (!state.pyReady) return;
+  const cands = pyCall('complete', t.buf);
+  if (!cands || !cands.length) return;
+  const m = t.buf.match(/[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)*$/);
+  if (!m) return;
+  const start = t.buf.length - m[0].length;
+  let common = cands[0];
+  for (const c of cands){
+    let i = 0;
+    while (i < common.length && i < c.length && common[i] === c[i]) i++;
+    common = common.slice(0, i);
+  }
+  if (cands.length === 1 || common.length > m[0].length){
+    t.buf = t.buf.slice(0, start) + common;
+    t.cursor = t.buf.length;
+    termRenderLine(t);
+  } else {
+    termAppend(t, cwdPromptText() + t.buf, 'p-echo');
+    termAppend(t, cands.slice(0, 40).join('   '), 'p-dim');
+    termRenderLine(t);
+  }
+}
+function submitInputLine(t, line){
+  t.inputMode = false;
+  finishStdin(line + '\n');
+}
+function termSubmit(t){
+  const line = t.buf;
+  t.buf = ''; t.cursor = 0;
+  finalizeLineEl(t);
+  termRenderLine(t);
+  if (line.trim() && t.hist[t.hist.length - 1] !== line) t.hist.push(line);
+  t.hi = -1;
+  if (t.inputMode){ submitInputLine(t, line); return; }
+  runQueue = runQueue.then(() => processLine(t, line), () => processLine(t, line));
+}
+async function processLine(t, line){
+  if (t.pending) t.codeBuf += '\n' + line; else t.codeBuf = line;
+  if (t.codeBuf.trim() === ''){ t.pending = false; termRenderLine(t); return; }
+  if (!state.pyReady){
+    termAppend(t, '⚠ Python nie jest jeszcze gotowy. Poczekaj na zakończenie ładowania.', 'p-err');
+    t.pending = false;
+    termRenderLine(t);
+    return;
+  }
+  const check = pyCall('compileCheck', t.codeBuf);
+  if (check === 'incomplete'){ t.pending = true; termRenderLine(t); return; }
+  const code = t.codeBuf;
+  t.codeBuf = ''; t.pending = false;
+  await runCode(t, code);
+}
+async function runCode(t, code){
+  t.busy = true;
+  state.termOwner = t;
+  termRenderLine(t);
+  if (state.interrupt) state.interrupt[0] = 0;
+  try {
+    await state.pyFn.runBlock(code);
+  } catch(err){
+    termAppend(t, '[PyOS] Błąd wykonania: ' + (err && err.message ? err.message : err), 'p-err');
+  }
+  if (state.interrupt) state.interrupt[0] = 0;
+  t.busy = false;
+  termRenderLine(t);
+  saveFSDebounced();
+  refreshFilesIfOpen();
+}
+function pyCall(fnName, ...args){
+  if (!state.pyReady || !state.pyFn[fnName]) return undefined;
+  try { return state.pyFn[fnName](...args); }
+  catch(e){ console.error('[pyCall]', fnName, e); return undefined; }
+}
+function updateTermHead(){
+  termSessions.forEach(t => {
+    const dot = t.head && t.head.querySelector('[data-role="dot"]');
+    const ver = t.head && t.head.querySelector('[data-role="ver"]');
+    if (!dot) return;
+    dot.className = 'dot' + (state.pyReady ? ' ok' : (state.pyError ? ' err' : ''));
+    ver.textContent = state.pyReady ? ('Python ' + state.pythonVersion)
+      : (state.pyError ? 'Python — błąd ładowania' : 'Python — ładowanie…');
+  });
+}
+function createTerminal(){
+  const content =
+    '<div class="term">' +
+      '<div class="term-head">' +
+        '<span class="dot" data-role="dot"></span>' +
+        '<span data-role="ver">Python — ładowanie…</span>' +
+        '<span class="spacer"></span>' +
+        '<button class="tbtn" data-act="help" title="Uruchom help()">Pomoc</button>' +
+        '<button class="tbtn" data-act="clear" title="Wyczyść ekran">Wyczyść</button>' +
+        '<button class="tbtn" data-act="restart" title="Zrestartuj środowisko Python">Restart</button>' +
+      '</div>' +
+      '<div class="term-body" tabindex="0"></div>' +
+    '</div>';
+  const rec = createWindow({ app:'terminal', title:'Terminal · Python', icon:'🐍', w:730, h:470, content,
+    onClose: () => { termSessions.delete(rec.id); state.termRec = null; } });
+  state.termRec = rec;
+  const t = {
+    rec, body: rec.win.querySelector('.term-body'), head: rec.win.querySelector('.term-head'),
+    buf:'', cursor:0, codeBuf:'', pending:false, busy:false, inputMode:false, hist:[], hi:-1,
+  };
+  t.lineEl = document.createElement('div');
+  t.lineEl.className = 't-line';
+  t.body.appendChild(t.lineEl);
+  termSessions.set(rec.id, t);
+  rec.win.querySelectorAll('.term-head button').forEach(b => {
+    b.addEventListener('click', () => {
+      const act = b.dataset.act;
+      if (act === 'help'){ if (state.pyReady && !t.busy) termSubmitText(t, 'help()'); }
+      else if (act === 'clear'){ termClear(t); }
+      else if (act === 'restart'){ restartPython(); }
+    });
+  });
+  if (state.pyReady) printBanner(t);
+  else if (state.pyError) termAppend(t, '✗ Nie udało się załadować Pythona — sprawdź internet i kliknij „Restart”.', 'p-err');
+  else termAppend(t, '⏳ Ładowanie środowiska Python (Pyodide z CDN)…', 'p-dim');
+  termRenderLine(t);
+  updateTermHead();
+  return rec;
+}
+function termSubmitText(t, text){
+  t.buf = text; t.cursor = text.length;
+  termSubmit(t);
+}
+
+// ---------- KLAWIATURA TERMINALA ----------
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape'){ closeCtx(); smEl.style.display = 'none'; return; }
+  const fw = state.focused;
+  if (!fw) return;
+  const t = termSessions.get(fw.id);
+  if (!t) return;
+  const tag = (document.activeElement || {}).tagName || '';
+  if ((e.key === ' ' || e.key === 'Enter') && (tag === 'BUTTON' || tag === 'INPUT' || tag === 'TEXTAREA')) return;
+  if (e.ctrlKey && (e.key === 'l' || e.key === 'L')){ e.preventDefault(); termClear(t); return; }
+  if (e.ctrlKey && (e.key === 'c' || e.key === 'C')){
+    e.preventDefault();
+    if (t.inputMode){
+      t.buf = ''; t.cursor = 0; termRenderLine(t);
+      submitInputLine(t, '');
+    } else if (t.busy){
+      if (state.interrupt){ state.interrupt[0] = 2; termAppend(t, '^C', 'p-dim'); }
+    } else {
+      const c = t.lineEl.querySelector('.caret');
+      if (c) c.insertAdjacentText('beforebegin', '^C');
+      finalizeLineEl(t);
+      t.buf = ''; t.cursor = 0; t.pending = false; t.codeBuf = '';
+      termRenderLine(t);
+    }
+    return;
+  }
+  if (t.busy && !t.inputMode) return;
+  e.preventDefault();
+  switch (e.key){
+    case 'Enter': termSubmit(t); break;
+    case 'Backspace':
+      if (t.cursor > 0){ t.buf = t.buf.slice(0, t.cursor - 1) + t.buf.slice(t.cursor); t.cursor--; termRenderLine(t); }
+      break;
+    case 'Delete':
+      if (t.cursor < t.buf.length){ t.buf = t.buf.slice(0, t.cursor) + t.buf.slice(t.cursor + 1); termRenderLine(t); }
+      break;
+    case 'ArrowLeft': if (t.cursor > 0){ t.cursor--; termRenderLine(t); } break;
+    case 'ArrowRight': if (t.cursor < t.buf.length){ t.cursor++; termRenderLine(t); } break;
+    case 'Home': t.cursor = 0; termRenderLine(t); break;
+    case 'End': t.cursor = t.buf.length; termRenderLine(t); break;
+    case 'ArrowUp': histNav(t, -1); break;
+    case 'ArrowDown': histNav(t, 1); break;
+    case 'Tab': termTab(t); break;
+    default:
+      if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) insertText(t, e.key);
+  }
+});
+document.addEventListener('paste', e => {
+  const fw = state.focused;
+  if (!fw) return;
+  const t = termSessions.get(fw.id);
+  if (!t) return;
+  e.preventDefault();
+  const txt = (e.clipboardData.getData('text/plain') || '').replace(/\r\n/g, '\n');
+  if (!txt) return;
+  if (t.inputMode || txt.indexOf('\n') === -1){
+    insertText(t, txt);
+    return;
+  }
+  const lines = txt.split('\n');
+  for (let i = 0; i < lines.length - 1; i++){
+    t.buf = lines[i]; t.cursor = t.buf.length;
+    termSubmit(t);
+  }
+  t.buf = lines[lines.length - 1];
+  t.cursor = t.buf.length;
+  termRenderLine(t);
+});
+
+// ================================================================
+//  PRZEGLĄDARKA
+// ================================================================
+function normalizeUrl(input){
+  let s = String(input).trim();
+  if (!s) return null;
+  if (/^[a-z]+:\/\//i.test(s)) return s;
+  if (/^(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(s)) return 'http://' + s;
+  if (/^[\w-]+(\.[\w-]+)+(:\d+)?(\/|$)/.test(s) && s.indexOf(' ') === -1) return 'https://' + s;
+  return 'https://pl.wikipedia.org/w/index.php?search=' + encodeURIComponent(s);
+}
+function createBrowser(startUrl){
+  const content =
+    '<div class="browser">' +
+      '<div class="b-nav">' +
+        '<button class="tbtn" data-a="back" title="Wstecz">◀</button>' +
+        '<button class="tbtn" data-a="fwd" title="Dalej">▶</button>' +
+        '<button class="tbtn" data-a="reload" title="Odśwież">⟳</button>' +
+        '<button class="tbtn" data-a="home" title="Strona startowa">⌂</button>' +
+        '<div class="b-addr"><span class="b-sec">🔒</span><input class="b-url" placeholder="Wpisz adres lub szukaj…" spellcheck="false"></div>' +
+        '<button class="tbtn" data-a="ext" title="Otwórz w prawdziwej karcie przeglądarki">⧉</button>' +
+      '</div>' +
+      '<div class="b-frame"><iframe src="about:blank"></iframe></div>' +
+      '<div class="b-quick">' +
+        '<button data-q="https://pl.wikipedia.org">Wikipedia PL</button>' +
+        '<button data-q="https://lite.duckduckgo.com/lite">DuckDuckGo Lite</button>' +
+        '<button data-q="https://www.openstreetmap.org">OpenStreetMap</button>' +
+        '<button data-q="https://example.com">example.com</button>' +
+        '<button data-q="https://pyodide.org">Pyodide</button>' +
+      '</div>' +
+      '<div class="b-note">ℹ️ Niektóre serwisy (np. Google, YouTube) blokują osadzanie w ramkach (X-Frame-Options) i nie otworzą się w tej mini-przeglądarce.</div>' +
+    '</div>';
+  const rec = createWindow({ app:'browser', title:'Przeglądarka', icon:'🌐', w:840, h:580, content });
+  const frame = rec.win.querySelector('.b-frame iframe');
+  const urlIn = rec.win.querySelector('.b-url');
+  const br = { hist: [], idx: -1, frame, urlIn };
+  function show(u){ urlIn.value = u; frame.src = u; }
+  function go(u){
+    if (u == null) return;
+    if (br.idx >= 0 && br.hist[br.idx] === u){ frame.src = u; return; }
+    br.hist = br.hist.slice(0, br.idx + 1);
+    br.hist.push(u);
+    br.idx = br.hist.length - 1;
+    show(u);
+  }
+  rec.win.querySelector('[data-a="back"]').addEventListener('click', () => { if (br.idx > 0){ br.idx--; show(br.hist[br.idx]); } });
+  rec.win.querySelector('[data-a="fwd"]').addEventListener('click', () => { if (br.idx < br.hist.length - 1){ br.idx++; show(br.hist[br.idx]); } });
+  rec.win.querySelector('[data-a="reload"]').addEventListener('click', () => { frame.src = frame.src; });
+  rec.win.querySelector('[data-a="home"]').addEventListener('click', () => go(HOME_PAGE));
+  rec.win.querySelector('[data-a="ext"]').addEventListener('click', () => {
+    const u = normalizeUrl(urlIn.value);
+    if (u) window.open(u, '_blank');
+  });
+  urlIn.addEventListener('keydown', e => { if (e.key === 'Enter'){ const u = normalizeUrl(urlIn.value); if (u) go(u); } });
+  urlIn.addEventListener('focus', () => urlIn.select());
+  rec.win.querySelectorAll('.b-quick [data-q]').forEach(b => b.addEventListener('click', () => go(b.dataset.q)));
+  go(startUrl || HOME_PAGE);
+  return rec;
+}
+
+// ================================================================
+//  MENEDŻER PLIKÓW
+// ================================================================
+function refreshFilesIfOpen(){
+  if (state.filesRec && state.wins.get(state.filesRec.id) && state.filesRec.api) filesRender(state.filesRec.api);
+}
+function deletePath(p, api){
+  if (!state.pyReady) return;
+  if (!confirm('Usunąć „' + basename(p) + '”?')) return;
+  try {
+    state.pyodide.runPython('import shutil, os\np = ' + JSON.stringify(p) + '\n(shutil.rmtree if os.path.isdir(p) else os.remove)(p)');
+    toast('Usunięto: ' + basename(p), 'Pliki');
+    saveFSDebounced();
+    filesRender(api);
+  } catch(e){ toast('Nie udało się usunąć', 'Pliki'); }
+}
+function renamePath(p, api){
+  if (!state.pyReady) return;
+  const nn = prompt('Nowa nazwa:', basename(p));
+  if (!nn || nn === basename(p)) return;
+  try {
+    state.pyodide.FS.rename(p, dirname(p) + '/' + nn.trim());
+    toast('Zmieniono nazwę', 'Pliki');
+    saveFSDebounced();
+    filesRender(api);
+  } catch(e){ toast('Nie udało się zmienić nazwy', 'Pliki'); }
+}
+function downloadPath(p){
+  try { downloadBytes(state.pyodide.FS.readFile(p), basename(p)); }
+  catch(e){ toast('Nie udało się pobrać pliku', 'Pliki'); }
+}
+function downloadBytes(bytes, name){
+  const blob = new Blob([bytes]);
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+function openFileFromFS(p){
+  let bytes;
+  try { bytes = state.pyodide.FS.readFile(p); }
+  catch(e){ toast('Nie udało się otworzyć pliku', 'Pliki'); return; }
+  if (isBinary(bytes)){ toast('Plik binarny — pobieram zamiast otwierać', 'Pliki'); downloadBytes(bytes, basename(p)); return; }
+  openApp('editor', { path: p });
+}
+function filesRender(api){
+  const list = api.rec.win.querySelector('[data-role="list"]');
+  const crumb = api.rec.win.querySelector('[data-role="crumb"]');
+  if (!state.pyReady || !state.pyodide){
+    list.innerHTML = '<div class="f-empty">System plików jeszcze nie gotowy…</div>';
+    crumb.innerHTML = '';
+    return;
+  }
+  let names = [];
+  try { names = state.pyodide.FS.readdir(api.path); }
+  catch(e){ list.innerHTML = '<div class="f-empty">Katalog nie istnieje.</div>'; crumb.innerHTML = ''; return; }
+  crumb.innerHTML = '';
+  const homeBtn = document.createElement('button');
+  homeBtn.textContent = '🏠';
+  homeBtn.title = HOME_DIR;
+  homeBtn.addEventListener('click', () => { api.path = HOME_DIR; api.sel = null; filesRender(api); });
+  crumb.appendChild(homeBtn);
+  const parts = api.path.split('/').filter(Boolean);
+  let acc = '';
+  parts.forEach(seg => {
+    acc += '/' + seg;
+    const sep = document.createElement('span');
+    sep.className = 'crumb-sep';
+    sep.textContent = '/';
+    const b = document.createElement('button');
+    b.textContent = seg;
+    (function(p){ b.addEventListener('click', () => { api.path = p; api.sel = null; filesRender(api); }); })(acc);
+    crumb.appendChild(sep);
+    crumb.appendChild(b);
+  });
+  const entries = [];
+  for (const n of names){
+    if (n === '.' || n === '..') continue;
+    const p = api.path + '/' + n;
+    try {
+      const st = state.pyodide.FS.stat(p);
+      entries.push({ n, p, dir: state.pyodide.FS.isDir(st.mode), size: st.size });
+    } catch(e){}
+  }
+  entries.sort((a, b) => (b.dir - a.dir) || a.n.localeCompare(b.n, 'pl'));
+  list.innerHTML = '';
+  if (!entries.length){ list.innerHTML = '<div class="f-empty">Pusty katalog</div>'; return; }
+  for (const e of entries){
+    const row = document.createElement('div');
+    row.className = 'f-row';
+    row.innerHTML = '<span class="f-ico">' + (e.dir ? '📁' : '📄') + '</span><span class="nm">' + esc(e.n) + '</span><span class="sz">' + (e.dir ? '' : fmtSize(e.size)) + '</span>';
+    row.addEventListener('click', () => {
+      api.sel = e.p;
+      list.querySelectorAll('.f-row').forEach(r => r.classList.remove('sel'));
+      row.classList.add('sel');
+    });
+    row.addEventListener('dblclick', () => {
+      if (e.dir){ api.path = e.p; api.sel = null; filesRender(api); }
+      else openFileFromFS(e.p);
+    });
+    row.addEventListener('contextmenu', ev => {
+      ev.preventDefault();
+      showCtx(ev.clientX, ev.clientY, [
+        { label: 'Otwórz', fn: () => { if (e.dir){ api.path = e.p; api.sel = null; filesRender(api); } else openFileFromFS(e.p); } },
+        { label: 'Pobierz', fn: () => { if (!e.dir) downloadPath(e.p); } },
+        { label: 'Zmień nazwę', fn: () => renamePath(e.p, api) },
+        { label: 'Usuń', fn: () => deletePath(e.p, api) },
+      ]);
+    });
+    list.appendChild(row);
+  }
+}
+function createFiles(){
+  const content =
+    '<div class="files">' +
+      '<div class="f-toolbar">' +
+        '<div class="f-crumb" data-role="crumb"></div>' +
+        '<span class="spacer"></span>' +
+        '<button class="tbtn" data-a="up" title="W górę">↑</button>' +
+        '<button class="tbtn" data-a="refresh" title="Odśwież">⟳</button>' +
+        '<button class="tbtn" data-a="mkdir" title="Nowy folder">📁 +</button>' +
+        '<button class="tbtn" data-a="touch" title="Nowy plik">📄 +</button>' +
+        '<button class="tbtn" data-a="upload" title="Importuj plik z dysku">⬆ Importuj</button>' +
+        '<button class="tbtn" data-a="del" title="Usuń zaznaczone">🗑</button>' +
+      '</div>' +
+      '<div class="f-list" data-role="list"></div>' +
+    '</div>';
+  const rec = createWindow({ app:'files', title:'Pliki', icon:'📁', w:620, h:450, content,
+    onClose: () => { state.filesRec = null; } });
+  state.filesRec = rec;
+  const api = { rec, path: HOME_DIR, sel: null };
+  rec.api = api;
+  const render = () => filesRender(api);
+  rec.win.querySelector('[data-a="up"]').addEventListener('click', () => { api.path = dirname(api.path); api.sel = null; render(); });
+  rec.win.querySelector('[data-a="refresh"]').addEventListener('click', render);
+  rec.win.querySelector('[data-a="mkdir"]').addEventListener('click', () => {
+    const n = prompt('Nazwa folderu:', 'nowy folder');
+    if (!n) return;
+    try { state.pyodide.FS.mkdir(api.path + '/' + n.trim()); toast('Utworzono folder', 'Pliki'); saveFSDebounced(); render(); }
+    catch(e){ toast('Nie udało się utworzyć folderu', 'Pliki'); }
+  });
+  rec.win.querySelector('[data-a="touch"]').addEventListener('click', () => {
+    const n = prompt('Nazwa pliku:', 'nowy.txt');
+    if (!n) return;
+    try { state.pyodide.FS.writeFile(api.path + '/' + n.trim(), ''); toast('Utworzono plik', 'Pliki'); saveFSDebounced(); render(); }
+    catch(e){ toast('Nie udało się utworzyć pliku', 'Pliki'); }
+  });
+  rec.win.querySelector('[data-a="del"]').addEventListener('click', () => {
+    if (api.sel) deletePath(api.sel, api);
+    else toast('Najpierw zaznacz plik lub folder na liście.', 'Pliki');
+  });
+  rec.win.querySelector('[data-a="upload"]').addEventListener('click', () => {
+    const inp = document.createElement('input');
+    inp.type = 'file';
+    inp.multiple = true;
+    inp.onchange = () => {
+      for (const f of inp.files){
+        const r = new FileReader();
+        r.onload = () => {
+          try {
+            state.pyodide.FS.writeFile(api.path + '/' + f.name, new Uint8Array(r.result));
+            toast('Zaimportowano: ' + f.name, 'Pliki');
+            saveFSDebounced();
+            render();
+          } catch(e){ toast('Błąd importu: ' + f.name, 'Pliki'); }
+        };
+        r.readAsArrayBuffer(f);
+      }
+    };
+    inp.click();
+  });
+  render();
+  return rec;
+}
+
+// ================================================================
+//  EDYTOR
+// ================================================================
+function createEditor(path){
+  const content =
+    '<div class="editor">' +
+      '<div class="ed-toolbar">' +
+        '<input class="ed-path" placeholder="ścieżka pliku, np. /home/user/notatka.txt" spellcheck="false">' +
+        '<button class="tbtn" data-a="open" title="Otwórz plik">Otwórz</button>' +
+        '<button class="tbtn primary" data-a="save" title="Zapisz (Ctrl+S)">Zapisz</button>' +
+        '<button class="tbtn" data-a="saveas" title="Zapisz jako">Zapisz jako…</button>' +
+        '<button class="tbtn" data-a="download" title="Pobierz na dysk">Pobierz</button>' +
+      '</div>' +
+      '<textarea spellcheck="false" placeholder="# Tu pisz swój kod lub notatki…\n# Ctrl+S zapisuje plik na wirtualnym dysku PyOS."></textarea>' +
+    '</div>';
+  const rec = createWindow({ app:'editor', title: path ? (basename(path) + ' — Edytor') : 'Nowy plik — Edytor', icon:'📝', w:700, h:490, content });
+  const api = { rec, path: path || null };
+  const ta = rec.win.querySelector('textarea');
+  const pIn = rec.win.querySelector('.ed-path');
+  if (path) pIn.value = path;
+  function loadInto(){
+    if (!state.pyReady) return;
+    let bytes;
+    try { bytes = state.pyodide.FS.readFile(api.path); }
+    catch(e){ toast('Nie można otworzyć pliku: ' + api.path, 'Edytor'); return; }
+    if (isBinary(bytes)){ toast('Plik wygląda na binarny — nie otwieram.', 'Edytor'); return; }
+    ta.value = new TextDecoder().decode(bytes);
+    setWinTitle(rec, basename(api.path) + ' — Edytor');
+  }
+  function save(){
+    if (!state.pyReady) return;
+    let p = api.path || pIn.value.trim();
+    if (!p){ p = prompt('Podaj ścieżkę pliku:', HOME_DIR + '/notatka.txt'); if (!p) return; }
+    p = resolvePath(p);
+    if (!p) return;
+    try {
+      mkdirTree(dirname(p));
+      state.pyodide.FS.writeFile(p, ta.value);
+      api.path = p;
+      pIn.value = p;
+      setWinTitle(rec, basename(p) + ' — Edytor');
+      toast('Zapisano: ' + p, 'Edytor');
+      saveFSDebounced();
+      refreshFilesIfOpen();
+    } catch(e){ toast('Nie udało się zapisać pliku', 'Edytor'); }
+  }
+  rec.win.querySelector('[data-a="open"]').addEventListener('click', () => {
+    let p = pIn.value.trim();
+    if (!p) p = prompt('Ścieżka pliku:', HOME_DIR + '/README.txt');
+    if (!p) return;
+    api.path = resolvePath(p);
+    pIn.value = api.path;
+    loadInto();
+  });
+  pIn.addEventListener('keydown', e => {
+    if (e.key === 'Enter'){
+      api.path = resolvePath(pIn.value);
+      if (api.path) loadInto();
+    }
+  });
+  rec.win.querySelector('[data-a="save"]').addEventListener('click', save);
+  rec.win.querySelector('[data-a="saveas"]').addEventListener('click', () => {
+    const p = prompt('Zapisz jako (pełna ścieżka):', api.path || HOME_DIR + '/notatka.txt');
+    if (!p) return;
+    api.path = resolvePath(p);
+    pIn.value = api.path;
+    save();
+  });
+  rec.win.querySelector('[data-a="download"]').addEventListener('click', () => {
+    downloadBytes(new TextEncoder().encode(ta.value), api.path ? basename(api.path) : 'plik.txt');
+  });
+  ta.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')){ e.preventDefault(); save(); }
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'o' || e.key === 'O')){ e.preventDefault(); rec.win.querySelector('[data-a="open"]').click(); }
+  });
+  if (path) loadInto();
+  return rec;
+}
+
+// ================================================================
+//  O SYSTEMIE
+// ================================================================
+function createAbout(){
+  const content =
+    '<div class="about">' +
+      '<div class="a-logo">🐍</div>' +
+      '<div class="a-name">PyOS <span class="a-ver">1.0</span></div>' +
+      '<div class="a-sub">Mini system operacyjny w przeglądarce</div>' +
+      '<ul class="a-list">' +
+        '<li>🐍 Terminal z pełnym Pythonem 3 (Pyodide/WebAssembly) jako głównym językiem</li>' +
+        '<li>🌐 Wbudowana przeglądarka stron</li>' +
+        '<li>📁 Menedżer plików z trwałym dyskiem (localStorage)</li>' +
+        '<li>📝 Edytor tekstu i kodu</li>' +
+        '<li>🖥️ Okna, pasek zadań, menu Start, tapety</li>' +
+        '<li>🔌 Python steruje systemem: open_url(), notify(), wallpaper(), shutdown()…</li>' +
+      '</ul>' +
+      '<div class="a-info">' +
+        'Python ' + esc(state.pythonVersion || '—') + ' · Pyodide ' + esc(state.pyodide ? state.pyodide.version : '—') + '<br>' +
+        esc(navigator.userAgent) +
+      '</div>' +
+      '<div class="a-note">' +
+        'Uwagi: przy pierwszym uruchomieniu Pythona potrzebny jest internet (Pyodide ~10 MB z CDN; później działa z pamięci podręcznej). ' +
+        'Serwisy z nagłówkiem X-Frame-Options (Google, YouTube) nie otworzą się w wewnętrznej przeglądarce. ' +
+        'Długa pętla Pythona może na chwilę zamrozić kartę — interpreter działa w tym samym wątku co interfejs (to mini-VM w jednym wątku 😉).' +
+      '</div>' +
+    '</div>';
+  const rec = createWindow({ app:'about', title:'O PyOS', icon:'ℹ️', w:540, h:560, content,
+    onClose: () => { state.aboutRec = null; } });
+  state.aboutRec = rec;
+  return rec;
+}
+
+// ================================================================
+//  START / WYŁĄCZANIE / RESTART
+// ================================================================
+function shutdown(){
+  document.getElementById('off').style.display = 'flex';
+}
+document.getElementById('off-on').addEventListener('click', () => reboot());
+
+async function reboot(){ await boot(); }
+
+async function boot(){
+  document.getElementById('off').style.display = 'none';
+  const bootEl = document.getElementById('boot');
+  const logEl = document.getElementById('boot-log');
+  const fill = document.getElementById('boot-fill');
+  bootEl.classList.remove('fade');
+  bootEl.style.display = 'flex';
+  logEl.innerHTML = '';
+  const log = (t, c) => {
+    const d = document.createElement('div');
+    d.textContent = '[ ' + (c === 'err' ? 'BŁĄD' : (c === 'warn' ? 'UWAGA' : 'OK')) + ' ] ' + t;
+    if (c) d.className = c;
+    logEl.appendChild(d);
+  };
+  const prog = p => { fill.style.width = p + '%'; };
+  closeAllWindows();
+  termSessions.clear();
+  log('PyOS 1.0 — start jądra');
+  prog(6);
+  await sleep(180);
+  log('Montowanie systemu plików (' + HOME_DIR + ')');
+  prog(16);
+  await sleep(200);
+  log('Pobieranie środowiska Python (Pyodide)…');
+  prog(30);
+  let ok = false;
+  try { ok = state.pyodide ? await initPython() : await loadPython(); }
+  catch(e){ ok = false; console.error('[boot]', e); }
+  if (ok) log('Python ' + state.pythonVersion + ' gotowy ✓');
+  else { state.pyError = true; log('Python niedostępny — sprawdź połączenie z internetem', 'warn'); }
+  prog(82);
+  await sleep(220);
+  log('Uruchamianie pulpitu…');
+  prog(100);
+  await sleep(400);
+  bootEl.classList.add('fade');
+  setTimeout(() => { bootEl.style.display = 'none'; }, 600);
+  openApp('terminal');
+  if (ok) toast('Witaj w PyOS! Wpisz help() w terminalu.', 'System gotowy');
+}
+
+// ---------- START ----------
+window.addEventListener('DOMContentLoaded', () => {
+  buildDesktop();
+  setWallpaper((() => { try { return localStorage.getItem(WP_KEY) || 'aurora'; } catch(e){ return 'aurora'; } })());
+  boot();
+});
+</script>
+</body>
+</html>

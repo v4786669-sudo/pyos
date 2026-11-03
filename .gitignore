@@ -1,0 +1,3 @@
+.pyos-gh-token
+*.token
+.git-credentials
